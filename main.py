@@ -1,3 +1,4 @@
+import sys, os
 import pandas as pd
 import numpy as np
 from datetime import datetime
@@ -5,7 +6,16 @@ import dateutil.relativedelta
 from xlrd import open_workbook
 from pandas import ExcelWriter
 from openpyxl import load_workbook
-excel_file_path = "Example Freel Original file - Copy.xlsx"
+
+if len(sys.argv) != 2:
+    print("Incorrect arguments. Please input file name")
+    sys.exit(0)
+
+excel_file_path = sys.argv[1]
+if not (os.path.exists(excel_file_path) and os.path.isfile(excel_file_path)):
+    print("Incorrect file path")
+    sys.exit(0)
+
 sheet_name = "Extract"
 converters = {'IP Name':str, 'IPN#':str, 'Role':str, 'P-Society':str, 'P-Share':str, 'M-Society':str, 'M-Share': str}
 
@@ -113,7 +123,7 @@ while row  < Extract_sheet.nrows:
     # merge Dataframes
     total_df = pd.concat([total_df, publisher_df])
 
-total_df.to_excel(writer,'New Dataset Python1', index=False)
+total_df.to_excel(writer,'New Dataset Python', index=False)
 
 # 2. Stage One
 
@@ -163,4 +173,6 @@ shared_df = shared_df.groupby(['Title_No', 'Title', 'IP Name'])['P-Share'].sum()
 stage_five_df = shared_df.drop_duplicates(subset=['Title', 'IP Name', '%'], keep=False).drop(['Title_No'], axis=1)
 stage_five_df = stage_five_df.rename(columns={'IP Name':'Creator'})
 stage_five_df.to_excel(writer, 'Stage Five', index=False)
+
+# 7. Save all sheets
 writer.save()
