@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime
 import dateutil.relativedelta
+import xlrd
 from xlrd import open_workbook
 from pandas import ExcelWriter
 from openpyxl import load_workbook
@@ -27,9 +28,9 @@ writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
 Extract_sheet = wb.sheet_by_name(sheet_name)
 
 # create empty dataframe
-# total_df = pd.DataFrame(columns=['Title', 'ISWC', 'SOCIETY', 'IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
-total_df = pd.DataFrame()
-total_creator_df = pd.DataFrame()
+total_df = pd.DataFrame(columns=['Title', 'ISWC', 'SOCIETY', 'IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
+# total_df = pd.DataFrame()
+total_creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
 
 # 1. Get New Dataset
 
@@ -82,9 +83,14 @@ while row  < Extract_sheet.nrows:
         if 'Publisher(s)' in next_paragraph_cell:
             creater_en_row = row1 - 2
             break
-    creator_df = pd.read_excel(excel_file_path, index_col = None, skiprows= creater_st_row, 
-        nrows= creater_en_row - creater_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols),
-        converters=converters)
+    creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
+    for row1 in range(creater_st_row + 1, creater_en_row+1):
+        row_list = Extract_sheet.row_values(row1, start_colx=2, end_colx=None)
+        creator_df.loc[len(creator_df)] = row_list
+
+    # creator_df = pd.read_excel(excel_file_path, index_col = None, skiprows= creater_st_row, 
+    #     nrows= creater_en_row - creater_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols),
+    #     converters=converters)
 
     # assign Title, ISWC, SOCIETY in creator dataframe
     creator_df = creator_df.assign(SOCIETY=society)[['SOCIETY'] + creator_df.columns.tolist()]
@@ -110,9 +116,14 @@ while row  < Extract_sheet.nrows:
         if 'Performer(s)' in next_paragraph_cell:
             publisher_en_row = row1 - 2
             break
-    publisher_df = pd.read_excel(excel_file_path, index_col = None, skiprows= publisher_st_row, 
-        nrows= publisher_en_row - publisher_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols), 
-        converters=converters)
+    publisher_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
+    for row1 in range(publisher_st_row + 1, publisher_en_row+1):
+        row_list = Extract_sheet.row_values(row1, start_colx=2, end_colx=None)
+        publisher_df.loc[len(publisher_df)] = row_list
+
+    # publisher_df = pd.read_excel(excel_file_path, index_col = None, skiprows= publisher_st_row, 
+    #     nrows= publisher_en_row - publisher_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols), 
+    #     converters=converters)
     row = row1
     # assign Title, ISWC, SOCIETY in publisher dataframe
     publisher_df = publisher_df.assign(SOCIETY=society)[['SOCIETY'] + publisher_df.columns.tolist()]
