@@ -11,7 +11,7 @@ from xlrd import open_workbook
 from pandas import ExcelWriter
 from openpyxl import load_workbook
 
-sheet_name = "Extract"
+# sheet_name = "Extract"
 
 def display_error_message(content):
     msg = QMessageBox()
@@ -33,7 +33,6 @@ class MainThread(QThread):
         writer = ExcelWriter(self.dst_filename, engine='openpyxl')
         # create empty dataframe
         total_df = pd.DataFrame(columns=['Title', 'ISWC', 'SOCIETY', 'IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
-        # total_df = pd.DataFrame()
         total_creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
         
         # if os.path.isfile(self.dst_filename):
@@ -47,120 +46,130 @@ class MainThread(QThread):
                 self.change_value.emit(0, 'Processing file : ' + filename)
                 wb = open_workbook(file)
                 book = load_workbook(file)
-                Extract_sheet = wb.sheet_by_name(sheet_name)
+                all_sheets = wb.sheet_names()
 
 
                 # 1. Get New Dataset
 
-                row = 0
                 title_cnt = 0
-                start_rows = []
-                titles = []
+                all_start_rows = []
+                all_titles = []
 
-                while row  < Extract_sheet.nrows:
-                    # get first cell of each row
-                    first_cell_of_row = Extract_sheet.cell_value(row, 0)
-                    # if first cell of row is not empty, it means new Title starts from its row
-                    title = ''
-                    if first_cell_of_row:
-                        start_rows.append(row)
-                        title = str(Extract_sheet.cell_value(row, 3))
-                        titles.append(title)
-                        title_cnt += 1
-                    row += 1
-                for index, start_row in enumerate(start_rows):
-                    end_row = 0
-                    if index == len(start_rows) - 1:
-                        end_row = Extract_sheet.nrows
-                    else:
-                        end_row = start_rows[index + 1]
+                # get start rows of new title for each sheet
+                for sheet_name in all_sheets:
+                    row = 0
+                    start_rows = []
+                    titles = []
+                    Extract_sheet = wb.sheet_by_name(sheet_name)
+                    while row  < Extract_sheet.nrows:
+                        # get first cell of each row
+                        first_cell_of_row = Extract_sheet.cell_value(row, 0)
+                        # if first cell of row is not empty, it means new Title starts from its row
+                        title = ''
+                        if first_cell_of_row:
+                            start_rows.append(row)
+                            title = str(Extract_sheet.cell_value(row, 3))
+                            titles.append(title)
+                            title_cnt += 1
+                        row += 1
+                    all_start_rows.append(start_rows)
+                    all_titles.append(titles)
+                title_index = 0
+                for index, start_rows in enumerate(all_start_rows):
+                    # sheet_df = pd.DataFrame(columns=['Title', 'ISWC', 'SOCIETY', 'IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
+                    # sheet_creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
+                    for index1, start_row in enumerate(start_rows):
+                        Extract_sheet = wb.sheet_by_name(all_sheets[index])
+                        end_row = 0
+                        if index1 == len(start_rows) - 1:
+                            end_row = Extract_sheet.nrows
+                        else:
+                            end_row = start_rows[index1 + 1]
 
-                    # get ISWC, Society, Last Update
-                    iswc = ''
-                    society = ''
-                    last_update = ''
-                    for row1 in range(start_row + 1, end_row):
-                        valid_row = False
-                        for col in range(0, Extract_sheet.ncols):
-                            cell_value = str(Extract_sheet.cell_value(row1, col))
-                            if cell_value.strip():
-                                valid_row = True
-                            if 'ISWC' in cell_value:
-                                iswc = Extract_sheet.cell_value(row1, col + 1)
-                            if 'Submitting Society' in cell_value:
-                                society = str(Extract_sheet.cell_value(row1, col + 1))
-                            if 'Society Work Code' in cell_value:
-                                society_code = str(Extract_sheet.cell_value(row1, col + 1))
-                            if 'Last Update' in cell_value:
-                                last_update = Extract_sheet.cell_value(row1, col + 1)
-                        # check if row is empty
-                        if not valid_row:
-                            row1 += 1
-                            break
-                    # find Creater dataframe
-                    creater_st_row = row1 + 1
-                    creater_en_row = row1 + 1
-                    for row1 in range(creater_st_row, end_row):
-                        next_paragraph_cell = Extract_sheet.cell_value(row1, 2)
-                        if 'Creator(s)' in next_paragraph_cell:
-                            creater_st_row = row1 + 1
-                        if 'Publisher(s)' in next_paragraph_cell:
-                            creater_en_row = row1 - 2
-                            break
-                    creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
-                    for row1 in range(creater_st_row + 1, creater_en_row+1):
-                        row_list = Extract_sheet.row_values(row1, start_colx=2, end_colx=None)
-                        creator_df.loc[len(creator_df)] = row_list
+                        # get ISWC, Society, Last Update
+                        iswc = ''
+                        society = ''
+                        last_update = ''
+                        for row1 in range(start_row + 1, end_row):
+                            valid_row = False
+                            for col in range(0, Extract_sheet.ncols):
+                                cell_value = str(Extract_sheet.cell_value(row1, col))
+                                if cell_value.strip():
+                                    valid_row = True
+                                if 'ISWC' in cell_value:
+                                    iswc = Extract_sheet.cell_value(row1, col + 1)
+                                if 'Submitting Society' in cell_value:
+                                    society = str(Extract_sheet.cell_value(row1, col + 1))
+                                if 'Society Work Code' in cell_value:
+                                    society_code = str(Extract_sheet.cell_value(row1, col + 1))
+                                if 'Last Update' in cell_value:
+                                    last_update = Extract_sheet.cell_value(row1, col + 1)
+                            # check if row is empty
+                            if not valid_row:
+                                row1 += 1
+                                break
+                        # find Creater dataframe
+                        creater_st_row = row1 + 1
+                        creater_en_row = row1 + 1
+                        for row1 in range(creater_st_row, end_row):
+                            next_paragraph_cell = Extract_sheet.cell_value(row1, 2)
+                            if 'Creator(s)' in next_paragraph_cell:
+                                creater_st_row = row1 + 1
+                            if 'Publisher(s)' in next_paragraph_cell:
+                                creater_en_row = row1 - 2
+                                break
+                        creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
+                        for row1 in range(creater_st_row + 1, creater_en_row+1):
+                            row_list = Extract_sheet.row_values(row1, start_colx=2, end_colx=None)
+                            creator_df.loc[len(creator_df)] = row_list
 
-                    # creator_df = pd.read_excel(excel_file_path, index_col = None, skiprows= creater_st_row, 
-                    #     nrows= creater_en_row - creater_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols),
-                    #     converters=converters)
+                        # creator_df = pd.read_excel(excel_file_path, index_col = None, skiprows= creater_st_row, 
+                        #     nrows= creater_en_row - creater_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols),
+                        #     converters=converters)
 
-                    # assign Title, ISWC, SOCIETY in creator dataframe
-                    creator_df = creator_df.assign(SOCIETY=society)[['SOCIETY'] + creator_df.columns.tolist()]
-                    creator_df = creator_df.assign(ISWC=iswc)[['ISWC'] + creator_df.columns.tolist()]
-                    creator_df = creator_df.assign(Title=titles[index])[['Title'] + creator_df.columns.tolist()]
-                    creator_df = creator_df.assign(LAST_UPDATE=last_update)
+                        # assign Title, ISWC, SOCIETY in creator dataframe
+                        creator_df = creator_df.assign(SOCIETY=society)[['SOCIETY'] + creator_df.columns.tolist()]
+                        creator_df = creator_df.assign(ISWC=iswc)[['ISWC'] + creator_df.columns.tolist()]
+                        creator_df = creator_df.assign(Title=all_titles[index][index1])[['Title'] + creator_df.columns.tolist()]
+                        creator_df = creator_df.assign(LAST_UPDATE=last_update)
 
-                    # merge Dataframes
-                    total_df = pd.concat([total_df, creator_df])
-                    # merge creator dataframe
-                    creator_df = creator_df.assign(Title_No=title_cnt)[['Title_No'] + creator_df.columns.tolist()]
-                    creator_df = creator_df.assign(Society_Code=society_code)[['Society_Code'] + creator_df.columns.tolist()]
-                    total_creator_df = pd.concat([total_creator_df, creator_df])
+                        # merge Dataframes
+                        total_df = pd.concat([total_df, creator_df])
+                        # merge creator dataframe
+                        creator_df = creator_df.assign(Title_No=title_cnt)[['Title_No'] + creator_df.columns.tolist()]
+                        creator_df = creator_df.assign(Society_Code=society_code)[['Society_Code'] + creator_df.columns.tolist()]
+                        total_creator_df = pd.concat([total_creator_df, creator_df])
 
 
-                    # find Publisher dataframe
-                    publisher_st_row = row1 + 1
-                    publisher_en_row = row1 + 1
-                    for row1 in range(publisher_st_row, end_row):
-                        next_paragraph_cell = Extract_sheet.cell_value(row1, 2)
-                        if 'Publisher(s)' in next_paragraph_cell:
-                            publisher_st_row = row1 + 1
-                        if 'Performer(s)' in next_paragraph_cell:
-                            publisher_en_row = row1 - 2
-                            break
-                    publisher_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
-                    for row1 in range(publisher_st_row + 1, publisher_en_row+1):
-                        row_list = Extract_sheet.row_values(row1, start_colx=2, end_colx=None)
-                        publisher_df.loc[len(publisher_df)] = row_list
+                        # find Publisher dataframe
+                        publisher_st_row = row1 + 1
+                        publisher_en_row = row1 + 1
+                        for row1 in range(publisher_st_row, end_row):
+                            next_paragraph_cell = Extract_sheet.cell_value(row1, 2)
+                            if 'Publisher(s)' in next_paragraph_cell:
+                                publisher_st_row = row1 + 1
+                            if 'Performer(s)' in next_paragraph_cell:
+                                publisher_en_row = row1 - 2
+                                break
+                        publisher_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
+                        for row1 in range(publisher_st_row + 1, publisher_en_row+1):
+                            row_list = Extract_sheet.row_values(row1, start_colx=2, end_colx=None)
+                            publisher_df.loc[len(publisher_df)] = row_list
 
-                    # publisher_df = pd.read_excel(excel_file_path, index_col = None, skiprows= publisher_st_row, 
-                    #     nrows= publisher_en_row - publisher_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols), 
-                    #     converters=converters)
-                    # assign Title, ISWC, SOCIETY in publisher dataframe
-                    publisher_df = publisher_df.assign(SOCIETY=society)[['SOCIETY'] + publisher_df.columns.tolist()]
-                    publisher_df = publisher_df.assign(ISWC=iswc)[['ISWC'] + publisher_df.columns.tolist()]
-                    publisher_df = publisher_df.assign(Title=titles[index])[['Title'] + publisher_df.columns.tolist()]
-                    publisher_df = publisher_df.assign(LAST_UPDATE =last_update)
+                        # publisher_df = pd.read_excel(excel_file_path, index_col = None, skiprows= publisher_st_row, 
+                        #     nrows= publisher_en_row - publisher_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols), 
+                        #     converters=converters)
+                        # assign Title, ISWC, SOCIETY in publisher dataframe
+                        publisher_df = publisher_df.assign(SOCIETY=society)[['SOCIETY'] + publisher_df.columns.tolist()]
+                        publisher_df = publisher_df.assign(ISWC=iswc)[['ISWC'] + publisher_df.columns.tolist()]
+                        publisher_df = publisher_df.assign(Title=all_titles[index][index1])[['Title'] + publisher_df.columns.tolist()]
+                        publisher_df = publisher_df.assign(LAST_UPDATE =last_update)
 
-                    # merge Dataframes
-                    total_df = pd.concat([total_df, publisher_df])
-                    self.change_value.emit(int((index+1) * 100 / title_cnt), 'Processing file : ' + filename)
+                        # merge Dataframes
+                        total_df = pd.concat([total_df, publisher_df])
+                        title_index += 1
+                        self.change_value.emit(int(title_index * 100 / title_cnt), 'Processing file : ' + filename)
 
-                    # self.prgressbar_Run.setValue(int((index+1) * 100 / title_cnt))
-                    # path, filename = os.path.split(file)
-                    # self.lbl_progress.setText('Processing file : ' + filename)
             total_df.to_excel(writer,'New Dataset Python', index=False)
 
             # 2. Stage One
@@ -215,6 +224,7 @@ class MainThread(QThread):
             stage_five_df = shared_df.drop_duplicates(subset=['Title', 'IP Name', '%'], keep=False).drop(['Title_No'], axis=1)
             stage_five_df = stage_five_df.rename(columns={'IP Name':'Creator'})
             stage_five_df.to_excel(writer, 'Stage Five', index=False)
+            
             # 7. Save all sheets
             writer.save()
             self.change_value.emit(100, 'Completed')
@@ -225,7 +235,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         uic.loadUi("main.ui", self)
-        self.setFixedSize(722, 532)
+        self.centralwidget.setContentsMargins(10, 10, 10, 10);
+        # self.setFixedSize(722, 532)
         self.selected_rows = []
         self.src_filenames = []
         self.dst_filename = ""
