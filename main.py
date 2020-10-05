@@ -8,7 +8,7 @@ from xlrd import open_workbook
 from pandas import ExcelWriter
 from openpyxl import load_workbook
 
-if len(sys.argv) != 2:
+if len(sys.argv) != 3:
     print("Incorrect arguments. Please input file name")
     sys.exit(0)
 
@@ -17,14 +17,17 @@ if not (os.path.exists(excel_file_path) and os.path.isfile(excel_file_path)):
     print("Incorrect file path")
     sys.exit(0)
 
+output_file_path = sys.argv[2]
+
 sheet_name = "Extract"
 converters = {'IP Name':str, 'IPN#':str, 'Role':str, 'P-Society':str, 'P-Share':str, 'M-Society':str, 'M-Share': str}
 
-writer = ExcelWriter(excel_file_path, engine='openpyxl')
+writer = ExcelWriter(output_file_path, engine='openpyxl')
 book = load_workbook(excel_file_path)
 wb = open_workbook(excel_file_path)
-writer.book = book
-writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
+if os.path.isfile(output_file_path):
+    writer.book = book
+    writer.sheets = dict((ws.title, ws) for ws in book.worksheets)
 Extract_sheet = wb.sheet_by_name(sheet_name)
 
 # create empty dataframe
@@ -36,26 +39,32 @@ total_creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society',
 
 row = 0
 title_cnt = 0
+start_rows = []
+titles = []
 while row  < Extract_sheet.nrows:
     # get first cell of each row
     first_cell_of_row = Extract_sheet.cell_value(row, 0)
     # if first cell of row is not empty, it means new Title starts from its row
     title = ''
     if first_cell_of_row:
+        start_rows.append(row)
+        title = str(Extract_sheet.cell_value(row, 3))
+        titles.append(title)
         title_cnt += 1
-        for col in range(0, Extract_sheet.ncols):
-            cell_value = str(Extract_sheet.cell_value(row, col))
-            if 'Title' in cell_value:
-                title = Extract_sheet.cell_value(row, col+1)
-    else: 
-        row += 1
-        continue
+    row += 1
+for index, start_row in enumerate(start_rows):
+    print(index)
+    end_row = 0
+    if index == len(start_rows) - 1:
+        end_row = Extract_sheet.nrows
+    else:
+        end_row = start_rows[index + 1]
 
     # get ISWC, Society, Last Update
     iswc = ''
     society = ''
     last_update = ''
-    for row1 in range(row + 1, Extract_sheet.nrows):
+    for row1 in range(start_row + 1, end_row):
         valid_row = False
         for col in range(0, Extract_sheet.ncols):
             cell_value = str(Extract_sheet.cell_value(row1, col))
@@ -76,7 +85,7 @@ while row  < Extract_sheet.nrows:
     # find Creater dataframe
     creater_st_row = row1 + 1
     creater_en_row = row1 + 1
-    for row1 in range(creater_st_row, Extract_sheet.nrows):
+    for row1 in range(creater_st_row, end_row):
         next_paragraph_cell = Extract_sheet.cell_value(row1, 2)
         if 'Creator(s)' in next_paragraph_cell:
             creater_st_row = row1 + 1
@@ -95,7 +104,7 @@ while row  < Extract_sheet.nrows:
     # assign Title, ISWC, SOCIETY in creator dataframe
     creator_df = creator_df.assign(SOCIETY=society)[['SOCIETY'] + creator_df.columns.tolist()]
     creator_df = creator_df.assign(ISWC=iswc)[['ISWC'] + creator_df.columns.tolist()]
-    creator_df = creator_df.assign(Title=title)[['Title'] + creator_df.columns.tolist()]
+    creator_df = creator_df.assign(Title=titles[index])[['Title'] + creator_df.columns.tolist()]
     creator_df = creator_df.assign(LAST_UPDATE=last_update)
 
     # merge Dataframes
@@ -109,7 +118,7 @@ while row  < Extract_sheet.nrows:
     # find Publisher dataframe
     publisher_st_row = row1 + 1
     publisher_en_row = row1 + 1
-    for row1 in range(publisher_st_row, Extract_sheet.nrows):
+    for row1 in range(publisher_st_row, end_row):
         next_paragraph_cell = Extract_sheet.cell_value(row1, 2)
         if 'Publisher(s)' in next_paragraph_cell:
             publisher_st_row = row1 + 1
@@ -124,11 +133,10 @@ while row  < Extract_sheet.nrows:
     # publisher_df = pd.read_excel(excel_file_path, index_col = None, skiprows= publisher_st_row, 
     #     nrows= publisher_en_row - publisher_st_row, sheet_name=sheet_name, usecols=range(2,Extract_sheet.ncols), 
     #     converters=converters)
-    row = row1
     # assign Title, ISWC, SOCIETY in publisher dataframe
     publisher_df = publisher_df.assign(SOCIETY=society)[['SOCIETY'] + publisher_df.columns.tolist()]
     publisher_df = publisher_df.assign(ISWC=iswc)[['ISWC'] + publisher_df.columns.tolist()]
-    publisher_df = publisher_df.assign(Title=title)[['Title'] + publisher_df.columns.tolist()]
+    publisher_df = publisher_df.assign(Title=titles[index])[['Title'] + publisher_df.columns.tolist()]
     publisher_df = publisher_df.assign(LAST_UPDATE =last_update)
 
     # merge Dataframes
