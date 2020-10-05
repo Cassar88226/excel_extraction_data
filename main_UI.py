@@ -40,9 +40,10 @@ class MainThread(QThread):
         #     writer.book = org_book
         #     writer.sheets = dict((ws.title, ws) for ws in org_book.worksheets)
         self.change_value.emit(0, 'Creating New Dataset')
-        try:
-            for file in self.src_filenames:
-                path, filename = os.path.split(file)
+        for file in self.src_filenames:
+            path, filename = os.path.split(file)
+            try:
+                
                 self.change_value.emit(0, 'Processing file : ' + filename)
                 wb = open_workbook(file)
                 book = load_workbook(file)
@@ -169,68 +170,69 @@ class MainThread(QThread):
                         total_df = pd.concat([total_df, publisher_df])
                         title_index += 1
                         self.change_value.emit(int(title_index * 100 / title_cnt), 'Processing file : ' + filename)
+            except:
+                self.change_value.emit(0, 'Error occurred in file : ' + filename)
+                return
 
-            total_df.to_excel(writer,'New Dataset Python', index=False)
+        total_df.to_excel(writer,'New Dataset Python', index=False)
 
-            # 2. Stage One
-            self.change_value.emit(100, 'Processing of Stage 1')
-            creator_group_df = total_creator_df.groupby('IP Name')['IPN#'].apply(set).reset_index(name='IPN list')
-            stage_one_df = pd.DataFrame(columns=['IP Name', 'IPN#'])
-            for i, row in creator_group_df.iterrows():
-                IPN_list = list(row['IPN list'])
-                if len(IPN_list) > 1 or (len(IPN_list) == 1 and np.nan in IPN_list):
-                    for entry in IPN_list:
-                        stage_one_df = stage_one_df.append({'IP Name':row['IP Name'], 'IPN#':entry}, ignore_index=True)
-            stage_one_df = stage_one_df.replace(np.nan, 'Blank', regex=True)
-            stage_one_df.to_excel(writer, 'Stage One', index=False)
+        # 2. Stage One
+        self.change_value.emit(100, 'Processing of Stage 1')
+        creator_group_df = total_creator_df.groupby('IP Name')['IPN#'].apply(set).reset_index(name='IPN list')
+        stage_one_df = pd.DataFrame(columns=['IP Name', 'IPN#'])
+        for i, row in creator_group_df.iterrows():
+            IPN_list = list(row['IPN list'])
+            if len(IPN_list) > 1 or (len(IPN_list) == 1 and np.nan in IPN_list):
+                for entry in IPN_list:
+                    stage_one_df = stage_one_df.append({'IP Name':row['IP Name'], 'IPN#':entry}, ignore_index=True)
+        stage_one_df = stage_one_df.replace(np.nan, 'Blank', regex=True)
+        stage_one_df.to_excel(writer, 'Stage One', index=False)
 
 
-            # 3. Stage Two
-            self.change_value.emit(100, 'Processing of Stage 2')
-            title_group_df = total_creator_df.groupby(['Title_No', 'Title', 'ISWC']).size().reset_index(name='counts')
-            title_group_df = title_group_df.groupby(['Title', 'ISWC'])['counts'].apply(set).reset_index(name='count_list')
-            # title_group_df['count_list'] = title_group_df['count_list'].astype(str)
-            stage_two_df = pd.DataFrame(columns=['Title', 'No. of Creators', 'ISWC'])
-            for i, row in title_group_df.iterrows():
-                creator_count_list = list(row['count_list'])
-                if len(creator_count_list) > 1:
-                    for entry in creator_count_list:
-                        stage_two_df = stage_two_df.append({'Title':row['Title'], 'No. of Creators':entry, 'ISWC':row['ISWC']}, ignore_index=True)
-            stage_two_df.to_excel(writer, 'Stage Two', index=False)
+        # 3. Stage Two
+        self.change_value.emit(100, 'Processing of Stage 2')
+        title_group_df = total_creator_df.groupby(['Title_No', 'Title', 'ISWC']).size().reset_index(name='counts')
+        title_group_df = title_group_df.groupby(['Title', 'ISWC'])['counts'].apply(set).reset_index(name='count_list')
+        # title_group_df['count_list'] = title_group_df['count_list'].astype(str)
+        stage_two_df = pd.DataFrame(columns=['Title', 'No. of Creators', 'ISWC'])
+        for i, row in title_group_df.iterrows():
+            creator_count_list = list(row['count_list'])
+            if len(creator_count_list) > 1:
+                for entry in creator_count_list:
+                    stage_two_df = stage_two_df.append({'Title':row['Title'], 'No. of Creators':entry, 'ISWC':row['ISWC']}, ignore_index=True)
+        stage_two_df.to_excel(writer, 'Stage Two', index=False)
 
-            # 4. Stage Three
-            self.change_value.emit(100, 'Processing of Stage 3')
-            stage_three_df = total_creator_df.loc[(total_creator_df['ISWC'] == 'No preferred') | (total_creator_df['ISWC'] == '')]
-            stage_three_df = stage_three_df.groupby(['Title', 'Society_Code']).size().reset_index(name='counts').drop(['counts'], axis=1)
-            stage_three_df.to_excel(writer, 'Stage Three', index=False)
+        # 4. Stage Three
+        self.change_value.emit(100, 'Processing of Stage 3')
+        stage_three_df = total_creator_df.loc[(total_creator_df['ISWC'] == 'No preferred') | (total_creator_df['ISWC'] == '')]
+        stage_three_df = stage_three_df.groupby(['Title', 'Society_Code']).size().reset_index(name='counts').drop(['counts'], axis=1)
+        stage_three_df.to_excel(writer, 'Stage Three', index=False)
 
-            # 5. Stage Four
-            self.change_value.emit(100, 'Processing of Stage 4')
-            end_time = datetime.now()
-            end_date = end_time.strftime('%Y/%m/%d')
-            start_time = end_time - dateutil.relativedelta.relativedelta(months=2)
-            start_date = start_time.strftime('%Y/%m/%d')
-            mask = ((total_creator_df['LAST_UPDATE'] > start_date) & (total_creator_df['LAST_UPDATE'] <= end_date)) |(total_creator_df['LAST_UPDATE'] == '')
-            stage_four_df = total_creator_df.loc[mask].groupby(['Title', 'LAST_UPDATE', 'ISWC']).size().reset_index(name='counts').drop(['counts'], axis=1)
-            stage_four_df.to_excel(writer, 'Stage Four', index=False)
+        # 5. Stage Four
+        self.change_value.emit(100, 'Processing of Stage 4')
+        end_time = datetime.now()
+        end_date = end_time.strftime('%Y/%m/%d')
+        start_time = end_time - dateutil.relativedelta.relativedelta(months=2)
+        start_date = start_time.strftime('%Y/%m/%d')
+        mask = ((total_creator_df['LAST_UPDATE'] > start_date) & (total_creator_df['LAST_UPDATE'] <= end_date)) |(total_creator_df['LAST_UPDATE'] == '')
+        stage_four_df = total_creator_df.loc[mask].groupby(['Title', 'LAST_UPDATE', 'ISWC']).size().reset_index(name='counts').drop(['counts'], axis=1)
+        stage_four_df.to_excel(writer, 'Stage Four', index=False)
 
-            # 6. Stage Five
-            self.change_value.emit(100, 'Processing of Stage 5')
-            # group by title and creator
-            shared_df = total_creator_df.loc[total_creator_df['P-Share'] != '*']
-            shared_df = shared_df.copy()
-            shared_df['P-Share'] = shared_df['P-Share'].astype('float')
-            shared_df = shared_df.groupby(['Title_No', 'Title', 'IP Name'])['P-Share'].sum().reset_index(name='%')#.apply(list)
-            stage_five_df = shared_df.drop_duplicates(subset=['Title', 'IP Name', '%'], keep=False).drop(['Title_No'], axis=1)
-            stage_five_df = stage_five_df.rename(columns={'IP Name':'Creator'})
-            stage_five_df.to_excel(writer, 'Stage Five', index=False)
-            
-            # 7. Save all sheets
-            writer.save()
-            self.change_value.emit(100, 'Completed')
-        except:
-            self.change_value.emit(0, 'Error occurred in input files')
-            # display_error_message("Input file format error")
+        # 6. Stage Five
+        self.change_value.emit(100, 'Processing of Stage 5')
+        # group by title and creator
+        shared_df = total_creator_df.loc[total_creator_df['P-Share'] != '*']
+        shared_df = shared_df.copy()
+        shared_df['P-Share'] = shared_df['P-Share'].astype('float')
+        shared_df = shared_df.groupby(['Title_No', 'Title', 'IP Name'])['P-Share'].sum().reset_index(name='%')#.apply(list)
+        stage_five_df = shared_df.drop_duplicates(subset=['Title', 'IP Name', '%'], keep=False).drop(['Title_No'], axis=1)
+        stage_five_df = stage_five_df.rename(columns={'IP Name':'Creator'})
+        stage_five_df.to_excel(writer, 'Stage Five', index=False)
+        
+        # 7. Save all sheets
+        writer.save()
+        self.change_value.emit(100, 'Completed')
+        # display_error_message("Input file format error")
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
