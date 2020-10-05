@@ -35,10 +35,6 @@ class MainThread(QThread):
         total_df = pd.DataFrame(columns=['Title', 'ISWC', 'SOCIETY', 'IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
         total_creator_df = pd.DataFrame(columns=['IP Name', 'IPN#', 'Role', 'P-Society', 'P-Share', 'M-Society', 'M-Share'])
         
-        # if os.path.isfile(self.dst_filename):
-        #     org_book = load_workbook(self.dst_filename)
-        #     writer.book = org_book
-        #     writer.sheets = dict((ws.title, ws) for ws in org_book.worksheets)
         self.change_value.emit(0, 'Creating New Dataset')
         for file in self.src_filenames:
             path, filename = os.path.split(file)
@@ -175,6 +171,8 @@ class MainThread(QThread):
                 return
 
         total_df.to_excel(writer,'New Dataset Python', index=False)
+        total_df.name = 'New Dataset Python'
+        # worksheet.write(0, 0, total_df.name)
 
         # 2. Stage One
         self.change_value.emit(100, 'Processing of Stage 1')
@@ -186,7 +184,13 @@ class MainThread(QThread):
                 for entry in IPN_list:
                     stage_one_df = stage_one_df.append({'IP Name':row['IP Name'], 'IPN#':entry}, ignore_index=True)
         stage_one_df = stage_one_df.replace(np.nan, 'Blank', regex=True)
+        stage_one_df.name = 'Creator IPN Nonunique'
+        start_column = 1
+        stage_one_df.to_excel(writer,'Report', index=False, startrow=3, startcol=start_column - 1)
         stage_one_df.to_excel(writer, 'Stage One', index=False)
+        worksheet = writer.sheets['Report']
+        worksheet.cell(row=1, column=start_column).value = 'Stage One'
+        worksheet.cell(row=3, column=start_column).value = stage_one_df.name
 
 
         # 3. Stage Two
@@ -200,13 +204,23 @@ class MainThread(QThread):
             if len(creator_count_list) > 1:
                 for entry in creator_count_list:
                     stage_two_df = stage_two_df.append({'Title':row['Title'], 'No. of Creators':entry, 'ISWC':row['ISWC']}, ignore_index=True)
+        stage_two_df.name = 'No. of Creators per Song'
         stage_two_df.to_excel(writer, 'Stage Two', index=False)
+        start_column += stage_one_df.shape[1]
+        stage_two_df.to_excel(writer,'Report', index=False, startrow=3, startcol=start_column - 1)
+        worksheet.cell(row=1, column=start_column).value = 'Stage Two'
+        worksheet.cell(row=3, column=start_column).value = stage_two_df.name
 
         # 4. Stage Three
         self.change_value.emit(100, 'Processing of Stage 3')
         stage_three_df = total_creator_df.loc[(total_creator_df['ISWC'] == 'No preferred') | (total_creator_df['ISWC'] == '')]
         stage_three_df = stage_three_df.groupby(['Title', 'Society_Code']).size().reset_index(name='counts').drop(['counts'], axis=1)
+        stage_three_df.name = 'Missing ISWC'
         stage_three_df.to_excel(writer, 'Stage Three', index=False)
+        start_column += stage_two_df.shape[1]
+        stage_three_df.to_excel(writer,'Report', index=False, startrow=3, startcol=start_column - 1)
+        worksheet.cell(row=1, column=start_column).value = 'Stage Three'
+        worksheet.cell(row=3, column=start_column).value = stage_three_df.name
 
         # 5. Stage Four
         self.change_value.emit(100, 'Processing of Stage 4')
@@ -216,7 +230,12 @@ class MainThread(QThread):
         start_date = start_time.strftime('%Y/%m/%d')
         mask = ((total_creator_df['LAST_UPDATE'] > start_date) & (total_creator_df['LAST_UPDATE'] <= end_date)) |(total_creator_df['LAST_UPDATE'] == '')
         stage_four_df = total_creator_df.loc[mask].groupby(['Title', 'LAST_UPDATE', 'ISWC']).size().reset_index(name='counts').drop(['counts'], axis=1)
+        stage_four_df.name = 'Last Update (< 2 month)'
         stage_four_df.to_excel(writer, 'Stage Four', index=False)
+        start_column += stage_three_df.shape[1]
+        stage_four_df.to_excel(writer,'Report', index=False, startrow=3, startcol=start_column - 1)
+        worksheet.cell(row=1, column=start_column).value = 'Stage Four'
+        worksheet.cell(row=3, column=start_column).value = stage_four_df.name
 
         # 6. Stage Five
         self.change_value.emit(100, 'Processing of Stage 5')
@@ -227,7 +246,12 @@ class MainThread(QThread):
         shared_df = shared_df.groupby(['Title_No', 'Title', 'IP Name'])['P-Share'].sum().reset_index(name='%')#.apply(list)
         stage_five_df = shared_df.drop_duplicates(subset=['Title', 'IP Name', '%'], keep=False).drop(['Title_No'], axis=1)
         stage_five_df = stage_five_df.rename(columns={'IP Name':'Creator'})
+        stage_five_df.name = '% Share Incorrect'
         stage_five_df.to_excel(writer, 'Stage Five', index=False)
+        start_column += stage_four_df.shape[1]
+        stage_five_df.to_excel(writer,'Report', index=False, startrow=3, startcol=start_column - 1)
+        worksheet.cell(row=1, column=start_column).value = 'Stage Five'
+        worksheet.cell(row=3, column=start_column).value = stage_five_df.name
         
         # 7. Save all sheets
         writer.save()
